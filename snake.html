@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Snake</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+</head>
+
+<body style="padding:0; margin:0; overflow:hidden;">
+    <canvas id="canvas"></canvas>
+    <script>
+        var gameInterval, canvas, ctx;
+        var tileCountWidth, tileCountHeight, tileWidth, tileHeight, vx, vy;
+        var score, t, apple, isGameOver, mouseX, mouseY, length, scaleX, scaleY, selected;
+
+        function init() {
+            tileCountWidth = 40
+            tileCountHeight = 40
+            tileWidth = 10;
+            tileHeight = 10;
+            snake = { body: [] };
+            length = 5;
+            setRandomCoords(snake);
+            apple = {};
+            setRandomCoords(apple);
+            vx = 1;
+            vy = 0;
+            score = 0;
+            isGameOver = false;
+            mouseX = 0;
+            mouseY = 0;
+            t = 0;
+            selected = -1;
+            gameInterval = setInterval(game, 1000 / 10);
+        }
+
+        window.onload = function () {
+            canvas = document.getElementById("canvas");
+            ctx = canvas.getContext("2d");
+
+            document.addEventListener("keydown", keyPush);
+            document.addEventListener("mousedown", mousePush);
+
+            window.addEventListener('resize', resizeCanvas, false);
+            window.addEventListener('orientationchange', resizeCanvas, false);
+            resizeCanvas();
+
+            init();
+        }
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            scaleX = window.innerWidth / 400;
+            scaleY = window.innerHeight / 600;
+
+            if (scaleX / scaleY > 1.3) {
+                scaleX = scaleY = 1;
+            }
+            ctx.scale(scaleX, scaleY);
+        }
+        function game() {
+            update();
+            draw();
+        }
+        function draw() {
+            color("black");
+            ctx.fillRect(0, 0, 400, 400);
+            color("white");
+            ctx.fillRect(0, 400, 400, 410);
+            for (var i = 0; i < snake.body.length; i++) {
+                ctx.fillRect(snake.body[i].x * tileWidth, snake.body[i].y * tileHeight, tileWidth, tileHeight);
+            }
+            color("red");
+            ctx.fillRect(apple.x * tileWidth, apple.y * tileHeight, tileWidth, tileHeight);
+
+            font(20);
+            color("black");
+            ctx.fillText("Score: " + score, 20, 450);
+
+            for (var i = 0; i < 4; i++) {
+                color("#ff9900");
+                if (selected == i) {
+                    color("#cc9900")
+                }
+                ctx.beginPath();
+                ctx.moveTo(300, 500);
+                ctx.arc(300, 500, 100, (i + 1 / 2) * (Math.PI / 2), (i + 3 / 2) * (Math.PI / 2));
+                ctx.fill();
+                color("black");
+                ctx.beginPath();
+                ctx.moveTo(300, 500);
+                ctx.arc(300, 500, 100, (i + 1 / 2) * (Math.PI / 2), (i + 3 / 2) * (Math.PI / 2));
+                ctx.stroke();
+            }
+            selected = -1;
+
+            if (isGameOver) {
+                color("red");
+                font(20);
+                ctx.fillText("Game over!", 160, 200);
+                font(14);
+                ctx.fillText("(tap to restart)", 152, 220);
+            }
+        }
+
+        function update() {
+            t++;
+            snake.x += vx;
+            snake.y += vy;
+            if (snake.x < 0 || snake.x >= tileCountWidth || snake.y < 0 || snake.y >= tileCountHeight) {
+                gameOver();
+            }
+
+            snake.body.push({ "x": snake.x, "y": snake.y });
+            if (snake.x == apple.x && snake.y == apple.y) {
+                length++;
+                setRandomCoords(apple);
+                score += 10 + max(50 - t, 0)
+                t = 0;
+            }
+
+            while (snake.body.length > length) {
+                snake.body.shift();
+            }
+        }
+        function max(a, b) {
+            return a > b ? a : b;
+        }
+        function keyPush(e) {
+            if (isGameOver) {
+                init();
+                return;
+            }
+            switch (e.keyCode) {
+                case 37:
+                    if (vx == 1) return;
+                    vx = -1;
+                    vy = 0;
+                    break;
+                case 38:
+                    if (vy == 1) return;
+                    vx = 0;
+                    vy = -1;
+                    break;
+                case 39:
+                    if (vx == -1) return;
+                    vx = 1;
+                    vy = 0;
+                    break;
+                case 40:
+                    if (vy == -1) return;
+                    vx = 0;
+                    vy = 1;
+                    break;
+            }
+        }
+        function mousePush(e) {
+            mouseX = e.clientX / scaleX - 300;
+            mouseY = e.clientY / scaleY - 500;
+            if (Math.sqrt(mouseX * mouseX + mouseY * mouseY) > 100) {
+                return;
+            }
+
+            if (Math.abs(mouseX) > Math.abs(mouseY)) {
+                if (mouseX < 0) {
+                    keyPush({ keyCode: 37 })
+                    selected = 1;
+                } else {
+                    keyPush({ keyCode: 39 })
+                    selected = 3;
+                }
+            } else {
+                if (mouseY < 0) {
+                    keyPush({ keyCode: 38 })
+                    selected = 2;
+                } else {
+                    keyPush({ keyCode: 40 })
+                    selected = 0;
+                }
+            }
+        }
+        function setRandomCoords(item) {
+            item.x = randomInt(tileCountWidth);
+            item.y = randomInt(tileCountHeight);
+        }
+        function randomInt(max) {
+            return Math.floor(Math.random() * max);
+        }
+        function font(size) {
+            ctx.font = size + "px Courier";
+        }
+        function color(c) {
+            ctx.fillStyle = c;
+        }
+        function gameOver() {
+            isGameOver = true;
+            clearInterval(gameInterval);
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const uid = urlParams.get('uid');
+            const mid = urlParams.get('mid');
+            const cid = urlParams.get('cid');
+            const imid = urlParams.get('imid');
+            if (imid) {
+                const request = new Request(`/setScore?uid=${uid}&imid=${imid}&score=${score}`);
+                fetch(request).then(response => console.log("set score"));
+            }
+            else {
+                const request = new Request(`/setScore?uid=${uid}&mid=${mid}&cid=${cid}&score=${score}`);
+                fetch(request).then(response => console.log("set score"));
+            }
+        }
+    </script>
+</body>
+
+</html>

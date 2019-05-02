@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+	<title>Stacker</title>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+</head>
+
+<body style="padding:0; margin:0; overflow:hidden;">
+	<canvas id="canvas"></canvas>
+	<script>
+		var gameInterval, canvas, ctx;
+		var score, t, isGameOver, mouseX, mouseY, scaleX, scaleY, selected, stack, next, v, perfect;
+		let VELOCITY = 15;
+
+		function init() {
+			next = { left: 0, width: 200 };
+			v = VELOCITY;
+			stack = [{ left: 100, width: 200 }];
+
+			score = 0;
+			isGameOver = false;
+			mouseX = 0;
+			mouseY = 0;
+			t = 0;
+			selected = -1;
+			perfect = 0;
+			gameInterval = setInterval(game, 1000 / 10);
+		}
+
+		window.onload = function () {
+			canvas = document.getElementById("canvas");
+			ctx = canvas.getContext("2d");
+
+			document.addEventListener("keydown", keyPush);
+			document.addEventListener("mousedown", mousePush);
+
+			window.addEventListener('resize', resizeCanvas, false);
+			window.addEventListener('orientationchange', resizeCanvas, false);
+			resizeCanvas();
+
+			init();
+		}
+
+		function resizeCanvas() {
+			canvas.width = window.innerWidth;
+			canvas.height = window.innerHeight;
+			scaleX = window.innerWidth / 400;
+			scaleY = window.innerHeight / 600;
+
+			if (scaleX / scaleY > 1.3) {
+				scaleX = scaleY = 1;
+			}
+			ctx.scale(scaleX, scaleY);
+		}
+		function game() {
+			update();
+			draw();
+		}
+		function draw() {
+			color("white");
+			ctx.fillRect(0, 0, canvas.width, canvas.height);
+			color("black");
+			ctx.fillRect(0, 0, 400, 400);
+
+			// Draw moving block
+			if (stack.length % 2 == 0) {
+				color("white");
+			} else {
+				color("red")
+			}
+			var y;
+			if (stack.length < 10) {
+				y = 380 - stack.length * 20;
+			} else {
+				y = 380 - 10 * 20;
+			}
+			ctx.fillRect(next.left, y, next.width, 20)
+
+
+			// Draw stack
+			var index = max(stack.length - 10, 0);
+			stack.slice(-10).forEach((element, i) => {
+				if (index % 2 == 0) {
+					color("white");
+				} else {
+					color("red")
+				}
+
+				let y = 380 - i * 20
+				ctx.fillRect(element.left, y, element.width, 20)
+				index++;
+			});
+
+			// Draw "perfect" marker
+			if (perfect > 0) {
+				font(20);
+				color("red");
+				let last = stack[stack.length - 1]
+				ctx.fillText("Perfect!", 170, 60);
+				perfect--;
+			}
+
+			// Draw score
+			font(20);
+			color("red");
+			ctx.fillText("Score: " + score, 170, 30);
+
+			// Draw touch controls
+			color("#ff9900");
+			if (selected) {
+				color("#cc9900")
+			}
+			ctx.beginPath();
+			ctx.moveTo(200, 500);
+			ctx.arc(200, 500, 100, 0, 2 * Math.PI);
+			ctx.fill();
+			selected = 0;
+			if (isGameOver) {
+				color("blue");
+				font(32);
+				ctx.fillText("Game over!", 140, 100);
+				font(24);
+			}
+		}
+
+		function update() {
+			t++;
+			next.left += v;
+			if (next.left + next.width >= 400) {
+				let diff = next.left + next.width - 400;
+				next.left -= diff;
+				v = -1 * VELOCITY;
+			} else if (next.left <= 0) {
+				let diff = 0 - next.left;
+				next.left += diff;
+				v = VELOCITY;
+			}
+			if (isGameOver) {
+				gameOver();
+			}
+		}
+		function max(a, b) {
+			return a > b ? a : b;
+		}
+		function min(a, b) {
+			return a < b ? a : b;
+		}
+		function keyPush(e) {
+			if (isGameOver) {
+				init();
+				return;
+			}
+			if (e.keyCode == 32) {
+				let last = stack[stack.length - 1];
+				var left = max(next.left, last.left);
+				let right = min(next.left + next.width, last.left + last.width);
+				var width = right - left;
+
+				if (stack[stack.length - 1].width - width < 10) {
+					width = stack[stack.length - 1].width
+					left = stack[stack.length - 1].left
+					perfect = 5;
+				}
+
+				if (width > 0) {
+					stack.push({ left: left, width: width })
+					score += 1;
+				} else {
+					gameOver();
+				}
+
+				if (v < 0) {
+					next = { left: 0, width: width }
+					v = VELOCITY
+				} else {
+					next = { left: 400 - width, width: width }
+					v = -1 * VELOCITY
+				}
+			}
+		}
+		function mousePush(e) {
+			mouseX = e.clientX / scaleX - 200;
+			mouseY = e.clientY / scaleY - 500;
+			if (Math.sqrt(mouseX * mouseX + mouseY * mouseY) > 100) {
+				return;
+			}
+			selected = 1;
+			keyPush({ keyCode: 32 })
+		}
+		function randomInt(max) {
+			return Math.floor(Math.random() * max);
+		}
+		function font(size) {
+			ctx.font = size + "px sans serif";
+		}
+		function color(c) {
+			ctx.fillStyle = c;
+		}
+		function gameOver() {
+			isGameOver = true;
+			draw();
+			clearInterval(gameInterval);
+
+			const urlParams = new URLSearchParams(window.location.search);
+			const uid = urlParams.get('uid');
+			const mid = urlParams.get('mid');
+			const cid = urlParams.get('cid');
+			const imid = urlParams.get('imid');
+			if (imid) {
+				const request = new Request(`/setScore?uid=${uid}&imid=${imid}&score=${score}`);
+				fetch(request).then(response => console.log("set score"));
+			}
+			else {
+				const request = new Request(`/setScore?uid=${uid}&mid=${mid}&cid=${cid}&score=${score}`);
+				fetch(request).then(response => console.log("set score"));
+			}
+
+		}
+	</script>
+</body>
+
+</html>
